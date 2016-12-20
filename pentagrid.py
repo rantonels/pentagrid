@@ -17,8 +17,12 @@ class Tile:
     def __init__(self,alpha,y = 0):
         self.alpha = alpha
         self.y = y
+    def inStr(self):
+        return format(self.alpha,'b')+","+str(self.y)
     def __str__(self):
-        return "("+format(self.alpha,'b')+","+str(self.y)+")"
+        return "("+self.inStr()+")"
+    def __repr__(self):
+        return "Tile(0b"+self.inStr()+")"
     def n(self):
         pass
 
@@ -49,7 +53,12 @@ class Tile:
                 Tile(south, self.y + delta_south),
                 Tile(other, self.y + delta_other)
                 )
-
+    def __eq__(self,other):
+        return (self.alpha == other.alpha) and (self.y == other.y)
+    def __neq__(self,other):
+        return not self.__eq__(other)
+    def __hash__(self):
+        return hash((self.alpha,self.y))
 
 #t = Tile(0b1001,1)
 #for nt in t.neighbours():
