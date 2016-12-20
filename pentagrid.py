@@ -2,7 +2,7 @@
 
 sign = lambda a: (a>0) - (a<0)
 
-mu0bar = int("10"*20, 2)
+mu0bar = int("10"*32, 2)
 
 def succ(alpha,inc=1): 
     # for successor: succ(alpha,1), predecessor: succ(alpha,-1)
@@ -13,9 +13,15 @@ def succ(alpha,inc=1):
     w = x ^ z ^ ((z+1) >> 2)
     return w
 
-class Tile:
+class Node:
+    pass
+
+class Tile(Node):
     def __init__(self,alpha,y = 0):
-        self.alpha = alpha
+        if isinstance(alpha,basestring):
+            self.alpha = int(alpha,2)
+        else:
+            self.alpha = alpha
         self.y = y
     def inStr(self):
         return format(self.alpha,'b')+","+str(self.y)
@@ -27,7 +33,7 @@ class Tile:
         pass
 
 
-    def neighbours(self):
+    def adjacent(self):
         north = self.alpha >> 2
         south = self.alpha << 2
         east = succ(south,+1)
@@ -48,18 +54,58 @@ class Tile:
 
 
         return  (Tile(north, self.y + delta_north),
-                Tile(west,  self.y + delta_west),
                 Tile(east,  self.y + delta_east),
                 Tile(south, self.y + delta_south),
+                Tile(west,  self.y + delta_west),
                 Tile(other, self.y + delta_other)
                 )
+
+    def neighbours(self):
+        adj = self.adjacent()
+        if (self.alpha & 1) == 1:
+            adj = [ adj[0], adj[4], adj[1], adj[2], adj[3] ]
+        out = []
+        for i in range(5):
+            a = adj[i]
+            b = adj[(i+1)%5]
+
+            c_candidates = [ e for e in a.adjacent() if (e in b.adjacent()) and not (e == self) ]
+            assert len(c_candidates) == 1 
+            c = c_candidates[0]
+            
+            out.append(Vertex([a,b,c,self]))
+        return out
+    
     def __eq__(self,other):
-        return (self.alpha == other.alpha) and (self.y == other.y)
+        if isinstance(other,Tile):
+            return (self.alpha == other.alpha) and (self.y == other.y)
+        else:
+            return False
     def __neq__(self,other):
         return not self.__eq__(other)
     def __hash__(self):
         return hash((self.alpha,self.y))
+    def __cmp__(self,other):
+        if self.alpha == other.alpha:
+            return sign(self.y - other.y)
+        else:
+            return sign(self.alpha - other.alpha)
 
-#t = Tile(0b1001,1)
-#for nt in t.neighbours():
-#    print nt
+class Vertex(Node):
+    def __init__(self,faces):
+        self.faces = sorted(faces)
+    def neighbours(self):
+        return self.faces
+    def __eq__(self,other):
+        if isinstance(other,Vertex):
+            return self.faces == other.faces
+        else:
+            return False
+    def __neq__(self,other):
+        return not self.__eq__(other)
+    def __hash__(self):
+        return hash((45,tuple(self.faces)))
+    def __str__(self):
+        return "["+"|".join(map(str, self.faces) ) + "]"
+    def __repr__(self):
+        return "Vertex(["+",".join(map(str,self.faces))+"])"
