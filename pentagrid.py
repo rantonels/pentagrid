@@ -40,33 +40,33 @@ def negadecode(code):
 
 def negaencode(n):
     #encode n as sum of negaFibonacci
-    m = n
-    out = 0
+    if n==0:
+        return 0
 
-    emergency = 0
+    nabs = abs(n)
 
-    while (m != 0):
-        if (m > 0):
-            i = 1
-            while(negafib(i) <= m):
-                i+= 2
-                emergency += 1
-                if emergency > 100000:
-                    exit(1)
-            i -= 2
-        else:
-            i = 2
-            while(negafib(i) >= m):
-                i+= 2
-                emergency +=1
-                if emergency > 100000:
-                    exit(1)
-            i -= 2
-        out += (1 << i)
-        m -= negafib(i)
+    S = 0
+    i = (1 if n>0 else 0)
+    #bits = 0
+    while (S < nabs):
+        S += fib(i)
+        i += 2
+    #    bits += 1
+
+    i-= 2
+
+    k = negafib(i)
     
-    return out
-            
+    m = n - k
+
+
+    assert(abs(m) < abs(n))
+
+    output = (1 << i-1) + negaencode(m)
+
+    return output
+    
+           
 
 
 # successor and predecessor as in Knuth
