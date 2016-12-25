@@ -1,8 +1,75 @@
 #!/usr/bin/env python
 
+from math import frexp
+import numpy as np
+
+# Math utilities
+
 sign = lambda a: (a>0) - (a<0)
 
+# memoized Fibonacci sequence
+
+def memoize(f):
+    cache = {}
+    return lambda *args: cache[args] if args in cache else cache.update({args: f(*args)}) or cache[args]
+
+@memoize
+def fib(n):
+    return n if n < 2 else fib(n-2) + fib(n-1)
+
+# negaFibonacci
+
+def negafib(n):
+    # F_(-n) = (-1)^(n+1) F_n
+    return ( 2*(n % 2 ) - 1 ) * fib(n)
+
+# magic number 0b101010...10
+
 mu0bar = int("10"*32, 2)
+
+# negaFibonacci code
+
+def negadecode(code):
+    #decode negaFibonacci code
+    length = frexp(code)[1]
+    out = 0
+    for i in range(length):
+        if ((code >> i) & 1):
+            out += negafib(i+1)
+    return out
+
+def negaencode(n):
+    #encode n as sum of negaFibonacci
+    m = n
+    out = 0
+
+    emergency = 0
+
+    while (m != 0):
+        if (m > 0):
+            i = 1
+            while(negafib(i) <= m):
+                i+= 2
+                emergency += 1
+                if emergency > 100000:
+                    exit(1)
+            i -= 2
+        else:
+            i = 2
+            while(negafib(i) >= m):
+                i+= 2
+                emergency +=1
+                if emergency > 100000:
+                    exit(1)
+            i -= 2
+        out += (1 << i)
+        m -= negafib(i)
+    
+    return out
+            
+
+
+# successor and predecessor as in Knuth
 
 def succ(alpha,inc=1): 
     # for successor: succ(alpha,1), predecessor: succ(alpha,-1)
@@ -13,24 +80,78 @@ def succ(alpha,inc=1):
     w = x ^ z ^ ((z+1) >> 2)
     return w
 
+# cardinal directions
+
+NORTH   = 0
+EAST    = 1
+SOUTH   = 2
+WEST    = 3
+OTHER   = 4
+
+negate_direction = {
+        SOUTH: NORTH,
+        EAST: EAST,
+        NORTH: SOUTH,
+        OTHER: WEST,
+        WEST: OTHER
+        }
+
+# some hyperboloid math
+
+y = np.sqrt( 1 + 2*np.sqrt(5) - 2*np.sqrt(5 + np.sqrt(5))) # ask wolframalpha
+
+step = np.array([(1+y*y)/(1-y*y) , 2*y/(1-y*y) , 0])
+
+# Lorentz boost given the target 3-vector
+def boost(a):
+    return np.matrix([[a[0], a[1], 0],[a[1],a[0],0] ,[0,0,1]] )
+
+flipper = np.matrix( [[1,0,0],[0,-1,0],[0,0,-1]] , dtype = np.float64)
+
+stepper = boost(step) * flipper * (boost(step).I)
+
+
+c_5,s_5 = np.cos(2*np.pi/5),np.sin(2*np.pi/5)
+rotator = np.matrix( [ [1,0,0],[0,c_5,s_5],[0,-s_5,c_5] ] , dtype= np.float64)
+
+
+
+
+# exceptions
+
+class NotFibonacciException(Exception):
+    pass
+
+# the real deal
+
 class Node:
     pass
 
 class Tile(Node):
-    def __init__(self,alpha,y = 0):
+    def __init__(self,alpha,y = 0,validate = True):
         if isinstance(alpha,basestring):
             self.alpha = int(alpha,2)
         else:
             self.alpha = alpha
+
+        if validate:
+            for i in range(frexp(self.alpha)[1]):
+                if ( 11 & (self.alpha >> i) == 11):
+                    raise NotFibonacciException("The code %s (%d) is not a valid Fibonacci code. There must be no consecutive 1s"%(bin(self.alpha),self.alpha))
+
         self.y = y
     def inStr(self):
-        return format(self.alpha,'b')+","+str(self.y)
+        return str(self.n())+","+str(self.y)
     def __str__(self):
         return "("+self.inStr()+")"
     def __repr__(self):
-        return "Tile(0b"+self.inStr()+")"
+        return "Tile("+self.inStr()+")"
     def n(self):
-        pass
+        try:
+            return self.N
+        except AttributeError:
+            self.N = negadecode(self.alpha)
+            return self.N
 
 
     def adjacent(self):
@@ -53,12 +174,59 @@ class Tile(Node):
             delta_other = sign(other - west) * ((other & west) == 0)
 
 
-        return  (Tile(north, self.y + delta_north),
-                Tile(east,  self.y + delta_east),
-                Tile(south, self.y + delta_south),
-                Tile(west,  self.y + delta_west),
-                Tile(other, self.y + delta_other)
+        return  (Tile(north, self.y + delta_north, validate = False),
+                Tile(east,  self.y + delta_east,   validate = False),
+                Tile(south, self.y + delta_south,  validate = False),
+                Tile(west,  self.y + delta_west,   validate = False),
+                Tile(other, self.y + delta_other,  validate = False)
                 )
+    def moveTowardsOrigin(self):
+        if self.alpha > 0:
+            direction = 0
+        elif self.y > 0:
+            direction = 2
+        elif self.y < 0:
+            direction = 0
+        else:
+            direction = None
+        if direction == None:
+            return (None,NORTH)
+        else:
+            return (self.adjacent()[direction],direction)
+
+    def orderedDirections(self):
+        if (self.alpha & 1 ) == 1:
+            return (0,4,1,2,3)
+        else:
+            return (0,1,2,3,4)
+
+    def direction_towards_parent(self):
+        return self.moveTowardsOrigin()[1]
+
+    def transformation(self):
+        try:
+            return self.transf
+        except AttributeError:
+
+            if self == origin:
+                self.transf = np.matrix(np.eye(3,dtype=np.float64))
+            else:
+                parent, direction_towards_parent = self.moveTowardsOrigin()
+                direction_from_parent = parent.adjacent().index(self)
+                ordirs = parent.orderedDirections()
+                rotate_units = ordirs.index(direction_from_parent)  -  ordirs.index(parent.direction_towards_parent()) 
+            #- ordirs.index(parent.moveTowardsOrigin()[1])
+                
+
+                addmatrix =  (rotator ** rotate_units) * stepper
+
+                self.transf = parent.transformation() * addmatrix
+
+
+            return self.transf
+
+    def position(self):
+        return np.squeeze(np.asarray(self.transformation().dot(np.array([1,0,0],dtype=np.float64))))
 
     def neighbours(self):
         adj = self.adjacent()
@@ -90,6 +258,8 @@ class Tile(Node):
             return sign(self.y - other.y)
         else:
             return sign(self.alpha - other.alpha)
+
+origin = Tile(0,0)
 
 class Vertex(Node):
     def __init__(self,faces):
